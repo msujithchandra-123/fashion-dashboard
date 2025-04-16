@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fashion Sales Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #charts > div {
+      margin-bottom: 50px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>📊 Fashion Sales Performance Dashboard</h2>
+  <input type="file" id="fileInput" accept=".json"><br><br>
+  <div id="charts">
+    <div id="salesOverTime"></div>
+    <div id="salesByItem"></div>
+    <div id="paymentDistribution"></div>
+    <div id="purchaseSegmentation"></div>
+    <div id="reviewDistribution"></div>
+  </div>
+
+  <script>
+    document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        try {
+          const data = JSON.parse(content);
+          const salesData = Array.isArray(data) ? data : [data];
+          generateDashboard(salesData);
+        } catch (err) {
+          alert("Invalid JSON file.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function generateDashboard(data) {
+      const parseDate = str => new Date(str.replace(/(\d{2})-(\d{2})-(\d{4})/, "$2/$1/$3"));
+      const dates = data.map(d => parseDate(d["Date Purchase"]));
+      const amounts = data.map(d => d["Purchase Amount (USD)"]);
+      const items = data.map(d => d["Item Purchased"]);
+      const methods = data.map(d => d["Payment Method"]);
+      const reviews = data.map(d => d["Review Rating"]).filter(r => r !== "");
+
+      // 1. Total Sales Over Time
+      const salesByDate = {};
+      data.forEach(d => {
+        const date = parseDate(d["Date Purchase"]).toDateString();
+        salesByDate[date] = (salesByDate[date] || 0) + d["Purchase Amount (USD)"];
+      });
+      const sortedDates = Object.keys(salesByDate).sort((a, b) => new Date(a) - new Date(b));
+      Plotly.newPlot("salesOverTime", [{
+        x: sortedDates,
+        y: sortedDates.map(d => salesByDate[d]),
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: { color: 'blue' }
+      }], {
+        title: "Total Sales Over Time",
+        xaxis: { title: "Date" },
+        yaxis: { title: "Total Sales (USD)" }
+      });
+
+      // 2. Sales by Item Purchased
+      const salesByItem = {};
+      data.forEach(d => {
+        const item = d["Item Purchased"];
+        salesByItem[item] = (salesByItem[item] || 0) + d["Purchase Amount (USD)"];
+      });
+      const itemNames = Object.keys(salesByItem);
+      Plotly.newPlot("salesByItem", [{
+        x: Object.values(salesByItem),
+        y: itemNames,
+        type: 'bar',
+        orientation: 'h',
+        marker: { color: 'teal' }
+      }], {
+        title: "Sales by Item Purchased",
+        xaxis: { title: "Total Sales (USD)" },
+        yaxis: { title: "Item" }
+      });
+
+      // 3. Payment Method Distribution
+      const methodCounts = {};
+      methods.forEach(method => methodCounts[method] = (methodCounts[method] || 0) + 1);
+      Plotly.newPlot("paymentDistribution", [{
+        labels: Object.keys(methodCounts),
+        values: Object.values(methodCounts),
+        type: 'pie',
+        hole: 0.4
+      }], {
+        title: "Payment Method Distribution"
+      });
+
+      // 4. Customer Purchase Value Segmentation
+      Plotly.newPlot("purchaseSegmentation", [{
+        x: amounts,
+        type: 'histogram',
+        marker: { color: 'purple' }
+      }], {
+        title: "Customer Purchase Value Segmentation",
+        xaxis: { title: "Purchase Amount (USD)" },
+        yaxis: { title: "Frequency" }
+      });
+
+      // 5. Review Rating Distribution
+      if (reviews.length > 0) {
+        const reviewCounts = {};
+        reviews.forEach(r => reviewCounts[r] = (reviewCounts[r] || 0) + 1);
+        Plotly.newPlot("reviewDistribution", [{
+          x: Object.keys(reviewCounts),
+          y: Object.values(reviewCounts),
+          type: 'bar',
+          marker: { color: 'orange' }
+        }], {
+          title: "Review Rating Distribution",
+          xaxis: { title: "Review Rating" },
+          yaxis: { title: "Count" }
+        });
+      } else {
+        document.getElementById("reviewDistribution").innerHTML = "<p>No review data available.</p>";
+      }
+    }
+  </script>
+
+</body>
+</html>
